@@ -66,16 +66,16 @@ from app.utils.logging_utils import configure_terminal_logger
 from app.utils import utils
 
 st.set_page_config(
-    page_title="MoneyPrinterTurbo",
+    page_title="Akasa",
     page_icon="🤖",
     layout="wide",
     initial_sidebar_state="auto",
     menu_items={
         "Report a bug": "https://github.com/harry0703/MoneyPrinterTurbo/issues",
-        "About": "# MoneyPrinterTurbo\nSimply provide a topic or keyword for a video, and it will "
-        "automatically generate the video copy, video materials, video subtitles, "
-        "and video background music before synthesizing a high-definition short "
-        "video.\n\nhttps://github.com/harry0703/MoneyPrinterTurbo",
+        "About": "# Akasa\nDonne un sujet ou un mot-clé, et Akasa génère automatiquement "
+        "le texte, les visuels, les sous-titres et la musique de fond avant de "
+        "produire une vidéo courte en haute définition.\n\nBasé sur MoneyPrinterTurbo : "
+        "https://github.com/harry0703/MoneyPrinterTurbo",
     },
 )
 
@@ -1650,7 +1650,7 @@ def _render_brand(available_update: str | None = None):
     st.markdown(
         f"""
         <h1 class="mpt-brand">
-            <span class="mpt-brand__name">MoneyPrinterTurbo</span>
+            <span class="mpt-brand__name">Akasa</span>
             <a class="mpt-brand__version"
                href="https://github.com/harry0703/MoneyPrinterTurbo"
                target="_blank"
@@ -4827,7 +4827,7 @@ def _render_loomloom_script_generation(params):
     _render_loomloom_candidates()
 
 
-def _render_script_settings(panel, params):
+def _render_script_settings(panel, params, simple_mode=False):
     """渲染文案设置并更新生成参数。"""
     with panel:
         with st.container(border=True):
@@ -4974,52 +4974,59 @@ def _render_script_settings(panel, params):
                             )
                         )
 
-            # 模型发现只增强视频素材，不改变用户明确选择的文案 Provider。
-            if _effective_script_generation_backend() == "loomloom":
-                _render_loomloom_script_generation(params)
-            else:
-                _render_local_script_generation(params)
-            params.video_script = st.text_area(
-                tr("Video Script"),
-                help=tr("Video Script Help"),
-                height=180,
-                key="video_script",
-            )
-            if _effective_script_generation_backend() == "loomloom":
-                st.caption(tr("LoomLoom Video Terms Reuse Help"))
-            elif st.button(
-                tr("Generate Video Keywords"),
-                key="auto_generate_terms",
-                use_container_width=True,
-                type="secondary",
-                icon=":material/auto_awesome:",
+            # 简单模式下，脚本预览/编辑默认折叠：用户不点开时，生成任务会在
+            # 后台自动根据主题生成文案和关键词，无需手动操作。
+            with st.expander(
+                tr("Preview and Edit Script"), expanded=not simple_mode
             ):
-                if not params.video_script:
-                    # 视频关键词需要基于文案提取，文案为空时提前提示并跳过模型调用。
-                    st.toast(tr("Please Enter the Video Subject"))
-                    st.warning(tr("Please Enter the Video Subject"))
+                # 模型发现只增强视频素材，不改变用户明确选择的文案 Provider。
+                if _effective_script_generation_backend() == "loomloom":
+                    _render_loomloom_script_generation(params)
                 else:
-                    with st.spinner(tr("Generating Video Keywords")):
-                        terms = _run_llm_read_operation(
-                            "generate_terms",
-                            lambda app_config_snapshot: llm.generate_terms(
-                                params.video_subject,
-                                params.video_script,
-                                amount=8 if params.match_materials_to_script else 5,
-                                match_script_order=params.match_materials_to_script,
-                                app_config=app_config_snapshot,
-                            ),
-                        )
-                        if "Error: " in terms:
-                            st.error(tr(terms))
-                        else:
-                            st.session_state["video_terms"] = ", ".join(terms)
+                    _render_local_script_generation(params)
+                params.video_script = st.text_area(
+                    tr("Video Script"),
+                    help=tr("Video Script Help"),
+                    height=180,
+                    key="video_script",
+                )
+                if _effective_script_generation_backend() == "loomloom":
+                    st.caption(tr("LoomLoom Video Terms Reuse Help"))
+                elif st.button(
+                    tr("Generate Video Keywords"),
+                    key="auto_generate_terms",
+                    use_container_width=True,
+                    type="secondary",
+                    icon=":material/auto_awesome:",
+                ):
+                    if not params.video_script:
+                        # 视频关键词需要基于文案提取，文案为空时提前提示并跳过模型调用。
+                        st.toast(tr("Please Enter the Video Subject"))
+                        st.warning(tr("Please Enter the Video Subject"))
+                    else:
+                        with st.spinner(tr("Generating Video Keywords")):
+                            terms = _run_llm_read_operation(
+                                "generate_terms",
+                                lambda app_config_snapshot: llm.generate_terms(
+                                    params.video_subject,
+                                    params.video_script,
+                                    amount=8
+                                    if params.match_materials_to_script
+                                    else 5,
+                                    match_script_order=params.match_materials_to_script,
+                                    app_config=app_config_snapshot,
+                                ),
+                            )
+                            if "Error: " in terms:
+                                st.error(tr(terms))
+                            else:
+                                st.session_state["video_terms"] = ", ".join(terms)
 
-            params.video_terms = st.text_area(
-                tr("Video Keywords"),
-                help=tr("Video Keywords Help"),
-                key="video_terms",
-            )
+                params.video_terms = st.text_area(
+                    tr("Video Keywords"),
+                    help=tr("Video Keywords Help"),
+                    key="video_terms",
+                )
 
 
 def _render_video_settings(panel, params):
@@ -7797,25 +7804,45 @@ def _render_application():
     if restore_applied or restore_succeeded:
         st.success(tr("Task Configuration Loaded"))
 
-    with st.container(key="main_settings_grid"):
-        panel = st.columns(4)
-    left_panel = panel[0]
-    middle_panel = panel[1]
-    audio_panel = panel[2]
-    right_panel = panel[3]
+    simple_mode = st.toggle(
+        tr("Simple Mode"),
+        value=_saved_ui_bool("simple_mode", True),
+        key="simple_mode_toggle",
+        help=tr("Simple Mode Help"),
+    )
+    _set_runtime_config("ui", "simple_mode", simple_mode)
+
+    if simple_mode:
+        left_panel = st.container()
+    else:
+        with st.container(key="main_settings_grid"):
+            panel = st.columns(4)
+        left_panel = panel[0]
+        middle_panel = panel[1]
+        audio_panel = panel[2]
+        right_panel = panel[3]
 
     params = VideoParams(video_subject="")
     params.match_materials_to_script = bool(
         st.session_state.get("match_materials_to_script", False)
     )
-    _render_script_settings(left_panel, params)
+    _render_script_settings(left_panel, params, simple_mode=simple_mode)
 
-    uploaded_files = _render_video_settings(middle_panel, params)
-    uploaded_audio_file, uploaded_bgm_file, voice_mode = _render_audio_settings(
-        audio_panel, params
-    )
+    if simple_mode:
+        with st.expander(tr("Advanced Settings"), expanded=False):
+            advanced_cols = st.columns(3)
+            uploaded_files = _render_video_settings(advanced_cols[0], params)
+            uploaded_audio_file, uploaded_bgm_file, voice_mode = (
+                _render_audio_settings(advanced_cols[1], params)
+            )
+            _render_subtitle_settings(advanced_cols[2], params)
+    else:
+        uploaded_files = _render_video_settings(middle_panel, params)
+        uploaded_audio_file, uploaded_bgm_file, voice_mode = _render_audio_settings(
+            audio_panel, params
+        )
 
-    _render_subtitle_settings(right_panel, params)
+        _render_subtitle_settings(right_panel, params)
 
     generation_submitted = _render_generation_controls(
         params,

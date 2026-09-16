@@ -546,7 +546,40 @@ def save_config():
                 os.remove(temp_path)
 
 
-_cfg = load_config()
+def _apply_streamlit_secrets_overrides(cfg):
+    """在内存中用 Streamlit Cloud 的 Secrets 覆盖 config.toml 中的同名字段。
+
+    Streamlit Community Cloud 的 "Secrets" 只会写入 st.secrets，并不会出现在
+    磁盘上的 config.toml 里。这里在加载配置后尝试读取 st.secrets，把匹配的
+    section/key 合并进内存中的配置，不写回磁盘，避免把密钥落地到仓库文件。
+    在非 Streamlit 环境（后台任务进程等）导入会失败，直接忽略即可。
+    """
+    try:
+        import streamlit as st
+
+        secrets = st.secrets
+    except Exception:
+        return cfg
+
+    try:
+        secrets_dict = dict(secrets)
+    except Exception:
+        return cfg
+
+    for section_name, section_value in secrets_dict.items():
+        if not isinstance(section_value, dict):
+            continue
+        existing_section = cfg.get(section_name)
+        if not isinstance(existing_section, dict):
+            existing_section = {}
+            cfg[section_name] = existing_section
+        for key, value in section_value.items():
+            existing_section[key] = value
+
+    return cfg
+
+
+_cfg = _apply_streamlit_secrets_overrides(load_config())
 app = _SynchronizedConfig(_cfg.get("app", {}))
 whisper = _cfg.get("whisper", {})
 proxy = _cfg.get("proxy", {})

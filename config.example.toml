@@ -630,9 +630,13 @@ hide_log = false
 # 视频生成完成后是否自动打开任务目录；关闭后仍可在任务管理中手动打开。
 open_task_folder_on_completion = true
 
+# Show the simplified WebUI by default: just a subject field and a Generate
+# button. Users can switch this off from the toggle to access every setting.
+simple_mode = true
+
 # The WebUI writes the remaining preferences automatically. Uncomment values
 # below only when you want to define initial defaults manually.
-# language = "zh"
+language = "fr"
 # video_language = ""
 # paragraph_number = 1
 # video_script_prompt = ""
