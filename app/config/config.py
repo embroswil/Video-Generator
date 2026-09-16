@@ -562,15 +562,17 @@ def _apply_streamlit_secrets_overrides(cfg):
         return cfg
 
     try:
-        secrets_dict = dict(secrets)
+        secrets_items = list(secrets.items())
     except Exception:
         return cfg
 
-    for section_name, section_value in secrets_dict.items():
-        if not isinstance(section_value, dict):
+    for section_name, section_value in secrets_items:
+        # st.secrets 返回的对象（AttrDict 等）通常不是原生 dict 的子类，
+        # 用 isinstance(..., dict) 判断会直接跳过，这里改用鸭子类型判断。
+        if not hasattr(section_value, "items"):
             continue
         existing_section = cfg.get(section_name)
-        if not isinstance(existing_section, dict):
+        if not hasattr(existing_section, "items"):
             existing_section = {}
             cfg[section_name] = existing_section
         for key, value in section_value.items():
